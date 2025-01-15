@@ -33,6 +33,14 @@ class realsense:
     def realsense_stop(self):
         self.pipeline.stop()
 
+def new_coordinates_after_resize_img(original_size, new_size, original_coordinate):
+  original_size = np.array(original_size)
+  new_size = np.array(new_size)
+  original_coordinate = np.array(original_coordinate)
+  xy = original_coordinate/(original_size/new_size)
+  x, y = int(xy[0]), int(xy[1])
+  return (x, y)
+
 def task_capture_frames_func(realsenses:list,queue_frames:Queue):
     while True:
         try:
@@ -54,40 +62,47 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
                 element = (rot_color,aligned_depth_frame,rot_depth)
                 list_detect.append(element)
             
-            img_v = None
-            depth_v = None
+            img_h = None
+            depth_h = None
                 
             if len(list_detect) == 2:
-                img_v = cv.hconcat([list_detect[0][0],list_detect[1][0]])
-                depth_v = cv.hconcat([list_detect[0][2],list_detect[1][2]])
+                img_h = cv.hconcat([list_detect[0][0],list_detect[1][0]])
+                depth_h = cv.hconcat([list_detect[0][2],list_detect[1][2]])
             elif len(list_detect) == 1:
-                img_v = cv.hconcat([list_detect[0][0],list_detect[0][0]])
-                depth_v = cv.hconcat([list_detect[0][2],list_detect[0][2]])
+                img_h = cv.hconcat([list_detect[0][0],list_detect[0][0]])
+                depth_h = cv.hconcat([list_detect[0][2],list_detect[0][2]])
 
-            img_resize = cv.resize(img_v,dsize=None,fx=0.5,fy=0.5) #640,960
+            img_resize_dwn = cv.resize(img_h,dsize=None,fx=0.5,fy=0.5,interpolation=cv.INTER_CUBIC) #640,960
 
             model = YOLO("yolo11n-seg.pt")
-            results = model.predict(source=img_resize, save=False, classes=[0],imgsz=[320,480])
+            results = model.predict(source=img_resize_dwn, save=False, classes=[0],imgsz=[320,480])
 
             
-            # arr_np = np.zeros(shape=(960,640),dtype=np.uint8)
-            # img_person = arr_np.reshape(960,640)
-            # for result in results:
-            #     masks = result.masks
-            #     if masks != None:
-            #         for mask in masks:
-            #             mask_person = (mask.data[0].numpy())*255
-            #             person = mask_person.astype(np.uint8)
-            #             tmp = cv.bitwise_or(img_person,person)
-            #             img_person = tmp
+            arr_np = np.zeros(shape=(320,480),dtype=np.uint8)
+            img_person_mask = arr_np.reshape(320,480)
+            for result in results:
+                masks = result.masks
+                if masks != None:
+                    for mask in masks:
+                        mask_person = (mask.data[0].numpy())*255
+                        person = mask_person.astype(np.uint8)
+                        tmp = cv.bitwise_or(img_person_mask,person)
+                        img_person_mask = tmp
 
+            img_person_mask_rz_up = cv.resize(img_person_mask,dsize=None,fx=2,fy=2,interpolation=cv.INTER_CUBIC)
+            person_mask = img_person_mask_rz_up == 0
+            depth_person = np.ma.masked_array(depth_h,person_mask)
+            minval = np.mean(depth_person[np.nonzero(depth_person)])*(list_detect[0][1].get_units())
+            print('distance : ',minval)
+
+            
             # m = img_person == 0
             # dp = np.ma.masked_array(depth_v,m)
             # minval = np.mean(dp[np.nonzero(dp)])*(list_detect[0][1].get_units())
             # print('distance : ',minval)
             # cv.putText(img_v, str(minval), (50,50), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-
+            list_rec = []
             for result in results:
                 boxes = result.boxes
                 for box in boxes:
@@ -97,12 +112,18 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
                     x1, y1, x2, y2 = box.xyxy[0]
                     label = f"{class_name} {confidence:.2f}"
                     if class_name == "person":          
-                        cv.rectangle(img_resize, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                        list_rec.append((int(x1),int(y1),int(x2),int(y2)))
+
+            if len(list_rec) != 0:
+                for rec in list_rec:
+                    point1 = new_coordinates_after_resize_img((320,480), (640,960), (rec[0],rec[1]))
+                    point2 = new_coordinates_after_resize_img((320,480), (640,960), (rec[2],rec[3]))
+                    cv.rectangle(img_h,point1,point2,(0,0,255),2)
             
-            img_scale = cv.resize(img_resize,dsize=None,fx=2,fy=2)
             
 
-            cv.imshow('win',img_scale)
+            cv.imshow('win1',img_h)
+            
             if cv.waitKey(1) == ord('q'):
                 break
         except Exception as e:
