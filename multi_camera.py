@@ -5,7 +5,7 @@ import numpy as np
 # config camera1
 pipeline_1 = rs.pipeline()
 config_1 = rs.config()
-config_1.enable_device('213522072335')
+config_1.enable_device('105322250851')
 config_1.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config_1.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 
@@ -24,7 +24,11 @@ try:
         depth_image_1 = np.asanyarray(depth_frame_1.get_data())
         color_image_1 = np.asanyarray(color_frame_1.get_data())
 
-        cv.imshow('cam1',color_image_1)
+        img_rot = cv.rotate(color_image_1,cv.ROTATE_90_COUNTERCLOCKWISE)
+
+        img_v = cv.hconcat([img_rot,img_rot])
+
+        cv.imshow('cam1',img_v)
         if cv.waitKey(1) == ord('q'):
             break
 
