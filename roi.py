@@ -12,16 +12,22 @@
 # print(minial)
 
 
+# import numpy as np
+
+# def new_coordinates_after_resize_img(original_size, new_size, original_coordinate):
+#   original_size = np.array(original_size)
+#   new_size = np.array(new_size)
+#   original_coordinate = np.array(original_coordinate)
+#   xy = original_coordinate/(original_size/new_size)
+#   x, y = int(xy[0]), int(xy[1])
+#   return (x, y)
+
+# output = new_coordinates_after_resize_img((1080,720), (244,244), (102, 34)) # just modify this line
+# print(output) # output: (23, 11)
+
+
 import numpy as np
 
-def new_coordinates_after_resize_img(original_size, new_size, original_coordinate):
-  original_size = np.array(original_size)
-  new_size = np.array(new_size)
-  original_coordinate = np.array(original_coordinate)
-  xy = original_coordinate/(original_size/new_size)
-  x, y = int(xy[0]), int(xy[1])
-  return (x, y)
+arr = arr = np.array([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [6, 7, 8, 9, 10], [6, 7, 8, 9, 10], [6, 7, 8, 9, 10]])
 
-output = new_coordinates_after_resize_img((1080,720), (244,244), (102, 34)) # just modify this line
-print(output) # output: (23, 11)
-
+print(arr[1:4,1:4])

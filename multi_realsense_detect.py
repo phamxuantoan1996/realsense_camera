@@ -92,15 +92,11 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
             img_person_mask_rz_up = cv.resize(img_person_mask,dsize=None,fx=2,fy=2,interpolation=cv.INTER_CUBIC)
             person_mask = img_person_mask_rz_up == 0
             depth_person = np.ma.masked_array(depth_h,person_mask)
-            minval = np.mean(depth_person[np.nonzero(depth_person)])*(list_detect[0][1].get_units())
-            print('distance : ',minval)
+            # minval = np.mean(depth_person[np.nonzero(depth_person)])*(list_detect[0][1].get_units())
+            # print('distance : ',minval)
 
             
-            # m = img_person == 0
-            # dp = np.ma.masked_array(depth_v,m)
-            # minval = np.mean(dp[np.nonzero(dp)])*(list_detect[0][1].get_units())
-            # print('distance : ',minval)
-            # cv.putText(img_v, str(minval), (50,50), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            
 
             list_rec = []
             for result in results:
@@ -113,12 +109,21 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
                     label = f"{class_name} {confidence:.2f}"
                     if class_name == "person":          
                         list_rec.append((int(x1),int(y1),int(x2),int(y2)))
-
+            
             if len(list_rec) != 0:
+                print(len(list_rec))
+                i = 0
                 for rec in list_rec:
                     point1 = new_coordinates_after_resize_img((320,480), (640,960), (rec[0],rec[1]))
                     point2 = new_coordinates_after_resize_img((320,480), (640,960), (rec[2],rec[3]))
+                    
+                    
+                    roi = depth_person[point1[1]:point2[1],point1[0]:point2[0]]
+                    distance = np.mean(roi[np.nonzero(roi)])*(list_detect[0][1].get_units())
+                    distance = round(distance,4)
+                    cv.putText(img_h, str(distance), (point1[0]+5, point1[1]+50), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
                     cv.rectangle(img_h,point1,point2,(0,0,255),2)
+                    i = i + 1
             
             
 
@@ -138,7 +143,8 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
 
 if __name__ == '__main__':
     queue_frames = Queue(maxsize=10240)
-    realsense1 = realsense(serial_number='105322250851')
+    # realsense1 = realsense(serial_number='105322250851')
+    realsense1 = realsense(serial_number='213522072335')
     realsense1.realsense_config()
     # realsense2 = realsense(serial_number='213522072335')
     # realsense2.realsense_config()
