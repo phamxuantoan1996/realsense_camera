@@ -45,6 +45,7 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
     while True:
         try:
             list_detect = []
+            index = 0
             for realsense in realsenses:
                 frame = realsense.pipeline.wait_for_frames()
                 # Align the depth frame to color frame
@@ -56,11 +57,18 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
                 if not aligned_depth_frame or not color_frame:
                     continue
                 color_image = np.asanyarray(color_frame.get_data())
-                rot_color = cv.rotate(color_image,cv.ROTATE_90_COUNTERCLOCKWISE)
                 depth_image = np.asanyarray(aligned_depth_frame.get_data())
-                rot_depth = cv.rotate(depth_image,cv.ROTATE_90_COUNTERCLOCKWISE)
+
+                if index == 0:
+                    rot_color = cv.rotate(color_image,cv.ROTATE_90_CLOCKWISE)
+                    rot_depth = cv.rotate(depth_image,cv.ROTATE_90_CLOCKWISE)
+                elif index == 1:
+                    rot_color = cv.rotate(color_image,cv.ROTATE_90_COUNTERCLOCKWISE)
+                    rot_depth = cv.rotate(depth_image,cv.ROTATE_90_COUNTERCLOCKWISE)
+
                 element = (rot_color,aligned_depth_frame,rot_depth)
                 list_detect.append(element)
+                index = index + 1
             
             img_h = None
             depth_h = None
@@ -71,13 +79,11 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
             elif len(list_detect) == 1:
                 img_h = cv.hconcat([list_detect[0][0],list_detect[0][0]])
                 depth_h = cv.hconcat([list_detect[0][2],list_detect[0][2]])
-
             img_resize_dwn = cv.resize(img_h,dsize=None,fx=0.5,fy=0.5,interpolation=cv.INTER_CUBIC) #640,960
 
             model = YOLO("yolo11n-seg.pt")
             results = model.predict(source=img_resize_dwn, save=False, classes=[0],imgsz=[320,480])
 
-            
             arr_np = np.zeros(shape=(320,480),dtype=np.uint8)
             img_person_mask = arr_np.reshape(320,480)
             for result in results:
@@ -92,11 +98,6 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
             img_person_mask_rz_up = cv.resize(img_person_mask,dsize=None,fx=2,fy=2,interpolation=cv.INTER_CUBIC)
             person_mask = img_person_mask_rz_up == 0
             depth_person = np.ma.masked_array(depth_h,person_mask)
-            # minval = np.mean(depth_person[np.nonzero(depth_person)])*(list_detect[0][1].get_units())
-            # print('distance : ',minval)
-
-            
-            
 
             list_rec = []
             for result in results:
@@ -112,18 +113,14 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
             
             if len(list_rec) != 0:
                 print(len(list_rec))
-                i = 0
                 for rec in list_rec:
                     point1 = new_coordinates_after_resize_img((320,480), (640,960), (rec[0],rec[1]))
                     point2 = new_coordinates_after_resize_img((320,480), (640,960), (rec[2],rec[3]))
-                    
-                    
                     roi = depth_person[point1[1]:point2[1],point1[0]:point2[0]]
                     distance = np.mean(roi[np.nonzero(roi)])*(list_detect[0][1].get_units())
                     distance = round(distance,4)
                     cv.putText(img_h, str(distance), (point1[0]+5, point1[1]+50), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 1)
                     cv.rectangle(img_h,point1,point2,(0,0,255),2)
-                    i = i + 1
             
             
 
@@ -143,13 +140,12 @@ def task_capture_frames_func(realsenses:list,queue_frames:Queue):
 
 if __name__ == '__main__':
     queue_frames = Queue(maxsize=10240)
-    # realsense1 = realsense(serial_number='105322250851')
-    realsense1 = realsense(serial_number='213522072335')
+    realsense1 = realsense(serial_number='105322250851')
     realsense1.realsense_config()
-    # realsense2 = realsense(serial_number='213522072335')
-    # realsense2.realsense_config()
+    realsense2 = realsense(serial_number='213522072335')
+    realsense2.realsense_config()
 
-    task_capture_frames = Thread(target=task_capture_frames_func,args=(realsenses:=[realsense1],queue_frames:=queue_frames))
+    task_capture_frames = Thread(target=task_capture_frames_func,args=(realsenses:=[realsense1,realsense2],queue_frames:=queue_frames))
     task_capture_frames.start()
 
     
